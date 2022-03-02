@@ -32,7 +32,8 @@ async function run(): Promise<void> {
       pullRequestTitle: Core.getInput('pull-request-title', optional),
       pullRequestBody: Core.getInput('pull-request-body', optional),
 
-      dryRun: Core.getBooleanInput('dry-run', optional),
+      // // TODO: Add dry run capability, for testing?
+      // dryRun: Core.getBooleanInput('dry-run', optional),
     }
 
     const commit = await getLatestSourceCommit(input)

@@ -62,7 +62,8 @@ function run() {
                 },
                 pullRequestTitle: Core.getInput('pull-request-title', optional),
                 pullRequestBody: Core.getInput('pull-request-body', optional),
-                dryRun: Core.getBooleanInput('dry-run', optional),
+                // // TODO: Add dry run capability, for testing?
+                // dryRun: Core.getBooleanInput('dry-run', optional),
             };
             const commit = yield getLatestSourceCommit(input);
             const branch = yield createPullBranchIfNotExists(Object.assign(Object.assign({}, input), { commit }));
