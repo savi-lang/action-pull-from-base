@@ -38,7 +38,6 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.createPullRequestIfNotExists = exports.createPullBranchIfNotExists = exports.getLatestSourceCommit = void 0;
 const Core = __importStar(__nccwpck_require__(2186));
 const GitHub = __importStar(__nccwpck_require__(5438));
-const request_error_1 = __nccwpck_require__(537);
 const required = { required: true };
 const optional = { required: false };
 function run() {
@@ -96,7 +95,8 @@ function createPullBranchIfNotExists(input) {
             // TODO: Deal with the potential race condition between "get" and "create".
         }
         catch (error) {
-            if (error instanceof request_error_1.RequestError && error.status === 404) {
+            const { status } = error;
+            if (status === 404) {
                 yield input.github.rest.git.createRef(Object.assign(Object.assign({}, input.targetRepo), { sha: input.commit, ref: `refs/heads/${branch}` }));
                 Core.info(`Finished creating branch ${branch}`);
             }

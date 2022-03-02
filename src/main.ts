@@ -84,7 +84,8 @@ export async function createPullBranchIfNotExists(input: {
     Core.info('A branch for this commit already exists')
     // TODO: Deal with the potential race condition between "get" and "create".
   } catch (error) {
-    if (error instanceof RequestError && error.status === 404) {
+    const { status } = error as RequestError
+    if (status === 404) {
       await input.github.rest.git.createRef({
         ...input.targetRepo,
         sha: input.commit,
