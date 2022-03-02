@@ -1,8 +1,8 @@
 {
-  "name": "typescript-action",
+  "name": "@savi-lang/action-pull-from-base",
   "version": "0.0.0",
   "private": true,
-  "description": "TypeScript template action",
+  "description": "A GitHub Action to automatically create pull requests from a changing upstream base repository.",
   "main": "lib/main.js",
   "scripts": {
     "build": "tsc",
@@ -25,7 +25,8 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@actions/core": "^1.6.0"
+    "@actions/core": "^1.6.0",
+    "@actions/github": "^5.0.0"
   },
   "devDependencies": {
     "@types/node": "^16.10.5",
