@@ -87,9 +87,10 @@ function getLatestSourceCommit(input) {
 exports.getLatestSourceCommit = getLatestSourceCommit;
 function createPullBranchIfNotExists(input) {
     return __awaiter(this, void 0, void 0, function* () {
-        Core.info(`Creating a pull request for commit ${input.commit}`);
+        Core.info(`Creating a pull request branch for commit ${input.commit}`);
         const branch = `${input.targetBranch}-sync-${input.commit.slice(0, 7)}`;
         try {
+            Core.info(`Checking for prior existence of a branch named ${branch}`);
             yield input.github.rest.repos.getBranch(Object.assign(Object.assign({}, input.targetRepo), { branch }));
             Core.info('A branch for this commit already exists');
             // TODO: Deal with the potential race condition between "get" and "create".
@@ -97,6 +98,7 @@ function createPullBranchIfNotExists(input) {
         catch (error) {
             const { status } = error;
             if (status === 404) {
+                Core.info(`Creating the branch`);
                 yield input.github.rest.git.createRef(Object.assign(Object.assign({}, input.targetRepo), { sha: input.commit, ref: `refs/heads/${branch}` }));
                 Core.info(`Finished creating branch ${branch}`);
             }

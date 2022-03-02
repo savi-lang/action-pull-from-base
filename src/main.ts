@@ -75,17 +75,19 @@ export async function createPullBranchIfNotExists(input: {
   targetBranch: string
   commit: string
 }): Promise<string> {
-  Core.info(`Creating a pull request for commit ${input.commit}`)
+  Core.info(`Creating a pull request branch for commit ${input.commit}`)
 
   const branch = `${input.targetBranch}-sync-${input.commit.slice(0, 7)}`
 
   try {
+    Core.info(`Checking for prior existence of a branch named ${branch}`)
     await input.github.rest.repos.getBranch({ ...input.targetRepo, branch })
     Core.info('A branch for this commit already exists')
     // TODO: Deal with the potential race condition between "get" and "create".
   } catch (error) {
     const { status } = error as RequestError
     if (status === 404) {
+      Core.info(`Creating the branch`)
       await input.github.rest.git.createRef({
         ...input.targetRepo,
         sha: input.commit,
