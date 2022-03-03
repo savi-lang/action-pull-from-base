@@ -45,6 +45,7 @@ function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const githubToken = Core.getInput('github-token', required);
+            const githubUsername = Core.getInput('github-username', optional);
             const sourceRepoString = Core.getInput('source-repo', required);
             const sourceBranch = Core.getInput('source-branch', required);
             const targetRepoString = Core.getInput('target-repo', required);
@@ -55,7 +56,7 @@ function run() {
             // const dryRun = Core.getBooleanInput('dry-run', optional)
             const input = {
                 github: GitHub.getOctokit(githubToken),
-                githubActor: GitHub.context.actor,
+                githubActor: githubUsername || GitHub.context.actor,
                 githubToken,
                 sourceRepoString,
                 sourceBranch,

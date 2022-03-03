@@ -7,6 +7,12 @@ inputs:
   github-token:
     description: User token to be associated with this pull request.
     required: true
+  github-username:
+    description: >
+      The username associated with the given `github-token`.
+      If the standard `secrets.GITHUB_TOKEN` is used, then this input
+      can be omitted, causing it to use the standard `GITHUB_ACTOR` env var.
+    required: false
   source-repo:
     description: Repo to pull from (e.g. `savi-lang/base-repo-library`)
     required: true
