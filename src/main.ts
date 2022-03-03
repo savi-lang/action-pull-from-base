@@ -11,7 +11,6 @@ const optional = { required: false }
 async function run(): Promise<void> {
   try {
     const githubToken = Core.getInput('github-token', required)
-    const githubUsername = Core.getInput('github-username', optional)
     const sourceRepoString = Core.getInput('source-repo', required)
     const sourceBranch = Core.getInput('source-branch', required)
     const targetRepoString = Core.getInput('target-repo', required)
@@ -23,7 +22,7 @@ async function run(): Promise<void> {
 
     const input = {
       github: GitHub.getOctokit(githubToken),
-      githubActor: githubUsername || GitHub.context.actor,
+      githubActor: GitHub.context.actor,
       githubToken,
 
       sourceRepoString,
