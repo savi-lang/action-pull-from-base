@@ -155,13 +155,13 @@ function createPullBranchLocally(input) {
         runCommand(['git', 'fetch', 'source-repo']);
         // Check if the target branch already contains the specified commit.
         // If it does, we have nothing left to do here.
-        runCommand(['git', 'checkout', input.targetBranch]);
+        runCommand(['git', 'fetch', 'target-repo']);
         const headAlreadyContainsCommit = runCommandAsBoolean([
             'git',
             'merge-base',
             '--is-ancestor',
             input.commit,
-            'HEAD',
+            `refs/remotes/target-repo/${input.targetBranch}`,
         ]);
         if (headAlreadyContainsCommit) {
             Core.info(`The target branch ${input.targetBranch} already contains this commit`);
