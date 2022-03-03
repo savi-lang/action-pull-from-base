@@ -157,7 +157,7 @@ export async function createPullBranchLocally(input: {
 
   // Check if the target branch already contains the specified commit.
   // If it does, we have nothing left to do here.
-  const headAlreadyContainsCommit = runCommandQuietlyAsBoolean([
+  const headAlreadyContainsCommit = runCommandAsBoolean([
     'git',
     'merge-base',
     '--is-ancestor',
@@ -253,8 +253,25 @@ function runCommand(
 }
 
 // TODO: Consider making this async instead of synchronous, for cleanliness.
-function runCommandQuietlyAsBoolean(args: string[]): boolean {
-  return spawnSync('/usr/bin/env', args).status === 0
+function runCommandAsBoolean(
+  args: string[],
+  options: { sensitive?: string } = {},
+): boolean {
+  // Get a version of the command that can be printed,
+  // possibly with a redaction of a sensitive string.
+  let showCommand = JSON.stringify(args)
+  if (options.sensitive)
+    showCommand = showCommand.replaceAll(options.sensitive, 'REDACTED')
+
+  // Run the command synchronously (blocking the event loop).
+  Core.info(`Running check command: ${showCommand}`)
+  const process = spawnSync('/usr/bin/env', args)
+
+  // Check success of the command.
+  const success = process.status === 0
+  Core.info(`The check returned ${success}`)
+
+  return success
 }
 
 run()
