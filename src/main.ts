@@ -44,6 +44,7 @@ async function run(): Promise<void> {
 
     const commit = await getLatestSourceCommit(input)
     const branch = await createPullBranchLocally({ ...input, commit })
+    if (!branch) return
     const pull = await createPullRequestIfNotExists({ ...input, branch })
 
     Core.setOutput('pull-request-url', pull.url)
@@ -121,7 +122,7 @@ export async function createPullBranchLocally(input: {
   targetRepoString: string
   targetBranch: string
   commit: string
-}): Promise<string> {
+}): Promise<string | undefined> {
   Core.info(`Locally creating a pull request branch for commit ${input.commit}`)
 
   const branch = `pull-from-base/${input.commit.slice(0, 7)}`
@@ -129,7 +130,6 @@ export async function createPullBranchLocally(input: {
 
   // Create an `source-repo` remote corresponding to the source repository.
   runCommand(
-    '/usr/bin/env',
     [
       'git',
       'remote',
@@ -142,7 +142,6 @@ export async function createPullBranchLocally(input: {
 
   // Create an `target-repo` remote corresponding to the source repository.
   runCommand(
-    '/usr/bin/env',
     [
       'git',
       'remote',
@@ -154,13 +153,29 @@ export async function createPullBranchLocally(input: {
   )
 
   // Fetch refs from the source repo, which should include the specified commit.
-  runCommand('/usr/bin/env', ['git', 'fetch', 'source-repo'])
+  runCommand(['git', 'fetch', 'source-repo'])
+
+  // Check if the target branch already contains the specified commit.
+  // If it does, we have nothing left to do here.
+  const headAlreadyContainsCommit = runCommandQuietlyAsBoolean([
+    'git',
+    'merge-base',
+    '--is-ancestor',
+    input.commit,
+    input.targetBranch,
+  ])
+  if (headAlreadyContainsCommit) {
+    Core.info(
+      `The target branch ${input.targetBranch} already contains this commit`,
+    )
+    return undefined
+  }
 
   // Checkout the specified commit into a new branch with the specified name.
-  runCommand('/usr/bin/env', ['git', 'checkout', '-b', branch, input.commit])
+  runCommand(['git', 'checkout', '-b', branch, input.commit])
 
   // Push the branch to the target repo.
-  runCommand('/usr/bin/env', [
+  runCommand([
     'git',
     'push',
     '-f',
@@ -216,19 +231,18 @@ export async function createPullRequestIfNotExists(input: {
 
 // TODO: Consider making this async instead of synchronous, for cleanliness.
 function runCommand(
-  command: string,
   args: string[],
   options: { sensitive?: string } = {},
 ): string {
   // Get a version of the command that can be printed,
   // possibly with a redaction of a sensitive string.
-  let showCommand = JSON.stringify([command, ...args])
+  let showCommand = JSON.stringify(args)
   if (options.sensitive)
     showCommand = showCommand.replaceAll(options.sensitive, 'REDACTED')
 
   // Run the command synchronously (blocking the event loop).
   Core.info(`Running command: ${showCommand}`)
-  const process = spawnSync(command, args)
+  const process = spawnSync('/usr/bin/env', args)
   const output = String(process.output)
 
   // If the command failed, throw an error.
@@ -236,6 +250,11 @@ function runCommand(
     throw new Error(`Command failed: ${showCommand} with output:\n${output}`)
 
   return output
+}
+
+// TODO: Consider making this async instead of synchronous, for cleanliness.
+function runCommandQuietlyAsBoolean(args: string[]): boolean {
+  return spawnSync('/usr/bin/env', args).status === 0
 }
 
 run()
