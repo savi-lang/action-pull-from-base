@@ -35,37 +35,45 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.createPullRequestIfNotExists = exports.createPullBranchIfNotExists = exports.getLatestSourceCommit = void 0;
+exports.createPullRequestIfNotExists = exports.createPullBranchLocally = exports.getLatestSourceCommit = void 0;
 const Core = __importStar(__nccwpck_require__(2186));
 const GitHub = __importStar(__nccwpck_require__(5438));
+const child_process_1 = __nccwpck_require__(3129);
 const required = { required: true };
 const optional = { required: false };
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
+            const githubToken = Core.getInput('github-token', required);
             const sourceRepoString = Core.getInput('source-repo', required);
+            const sourceBranch = Core.getInput('source-branch', required);
             const targetRepoString = Core.getInput('target-repo', required);
+            const targetBranch = Core.getInput('target-branch', required);
+            const pullRequestTitle = Core.getInput('pull-request-title', optional);
+            const pullRequestBody = Core.getInput('pull-request-body', optional);
+            // // TODO: Add dry run capability, for testing?
+            // const dryRun = Core.getBooleanInput('dry-run', optional)
             const input = {
-                github: GitHub.getOctokit(Core.getInput('github-token', required)),
+                github: GitHub.getOctokit(githubToken),
+                githubActor: GitHub.context.actor,
+                githubToken,
                 sourceRepoString,
-                sourceBranch: Core.getInput('source-branch', required),
+                sourceBranch,
                 sourceRepo: {
                     owner: sourceRepoString.split('/')[0],
                     repo: sourceRepoString.split('/')[1],
                 },
                 targetRepoString,
-                targetBranch: Core.getInput('target-branch', required),
+                targetBranch,
                 targetRepo: {
                     owner: targetRepoString.split('/')[0],
                     repo: targetRepoString.split('/')[1],
                 },
-                pullRequestTitle: Core.getInput('pull-request-title', optional),
-                pullRequestBody: Core.getInput('pull-request-body', optional),
-                // // TODO: Add dry run capability, for testing?
-                // dryRun: Core.getBooleanInput('dry-run', optional),
+                pullRequestTitle,
+                pullRequestBody,
             };
             const commit = yield getLatestSourceCommit(input);
-            const branch = yield createPullBranchIfNotExists(Object.assign(Object.assign({}, input), { commit }));
+            const branch = yield createPullBranchLocally(Object.assign(Object.assign({}, input), { commit }));
             const pull = yield createPullRequestIfNotExists(Object.assign(Object.assign({}, input), { branch }));
             Core.setOutput('pull-request-url', pull.url);
             Core.setOutput('pull-request-number', pull.number);
@@ -85,31 +93,80 @@ function getLatestSourceCommit(input) {
     });
 }
 exports.getLatestSourceCommit = getLatestSourceCommit;
-function createPullBranchIfNotExists(input) {
+// // TODO: Get this function working using octokit.
+// //
+// // As of today, it doesn't work because GitHub doesn't recognize the
+// // history relationship with the upstream base repository.
+// //
+// // See https://support.github.com/ticket/personal/0/1527459
+// export async function createPullBranchIfNotExists(input: {
+//   github: Octokit
+//   targetRepo: { owner: string; repo: string }
+//   targetBranch: string
+//   commit: string
+// }): Promise<string> {
+//   Core.info(`Creating a pull request branch for commit ${input.commit}`)
+//   const branch = `${input.targetBranch}-sync-${input.commit.slice(0, 7)}`
+//   try {
+//     Core.info(`Checking for prior existence of a branch named ${branch}`)
+//     await input.github.rest.repos.getBranch({ ...input.targetRepo, branch })
+//     Core.info('A branch for this commit already exists')
+//     // TODO: Deal with the potential race condition between "get" and "create".
+//   } catch (error) {
+//     const { status } = error as RequestError
+//     if (status === 404) {
+//       Core.info(`Creating the branch`)
+//       await input.github.rest.git.createRef({
+//         ...input.targetRepo,
+//         sha: input.commit,
+//         ref: `refs/heads/${branch}`,
+//       })
+//       Core.info(`Finished creating branch ${branch}`)
+//     } else {
+//       throw error instanceof Error ? error : Error(`${error}`)
+//     }
+//   }
+//   return branch
+// }
+function createPullBranchLocally(input) {
     return __awaiter(this, void 0, void 0, function* () {
-        Core.info(`Creating a pull request branch for commit ${input.commit}`);
-        const branch = `${input.targetBranch}-sync-${input.commit.slice(0, 7)}`;
-        try {
-            Core.info(`Checking for prior existence of a branch named ${branch}`);
-            yield input.github.rest.repos.getBranch(Object.assign(Object.assign({}, input.targetRepo), { branch }));
-            Core.info('A branch for this commit already exists');
-            // TODO: Deal with the potential race condition between "get" and "create".
-        }
-        catch (error) {
-            const { status } = error;
-            if (status === 404) {
-                Core.info(`Creating the branch`);
-                yield input.github.rest.git.createRef(Object.assign(Object.assign({}, input.targetRepo), { sha: input.commit, ref: `refs/heads/${branch}` }));
-                Core.info(`Finished creating branch ${branch}`);
-            }
-            else {
-                throw error instanceof Error ? error : Error(`${error}`);
-            }
-        }
+        Core.info(`Locally creating a pull request branch for commit ${input.commit}`);
+        const branch = `pull-from-base/${input.commit.slice(0, 7)}`;
+        const auth = `${input.githubActor}:${input.githubToken}`;
+        // Create an `upstream` remote corresponding to the source repository.
+        runCommand('/usr/bin/env', [
+            'git',
+            'remote',
+            'add',
+            'upstream',
+            `https://${auth}@github.com/${input.sourceRepoString}.git`,
+        ], { sensitive: auth });
+        // Create an `origin` remote corresponding to the source repository.
+        runCommand('/usr/bin/env', [
+            'git',
+            'remote',
+            'add',
+            'origin',
+            `https://${auth}@github.com/${input.targetRepoString}.git`,
+        ], { sensitive: auth });
+        // Fetch refs from the upstream, which should include the specified commit.
+        runCommand('/usr/bin/env', ['git', 'fetch', 'upstream']);
+        // Checkout the specified commit into a new branch with the specified name.
+        runCommand('/usr/bin/env', ['git', 'checkout', '-b', branch, input.commit]);
+        // Push the branch to the origin.
+        runCommand('/usr/bin/env', [
+            'git',
+            'push',
+            '-f',
+            '-u',
+            '--set-upstream',
+            'origin',
+            branch,
+        ]);
         return branch;
     });
 }
-exports.createPullBranchIfNotExists = createPullBranchIfNotExists;
+exports.createPullBranchLocally = createPullBranchLocally;
 function createPullRequestIfNotExists(input) {
     return __awaiter(this, void 0, void 0, function* () {
         Core.info(`Creating a pull request for branch ${input.branch}`);
@@ -129,6 +186,22 @@ function createPullRequestIfNotExists(input) {
     });
 }
 exports.createPullRequestIfNotExists = createPullRequestIfNotExists;
+// TODO: Consider making this async instead of synchronous, for cleanliness.
+function runCommand(command, args, options = {}) {
+    // Get a version of the command that can be printed,
+    // possibly with a redaction of a sensitive string.
+    let showCommand = JSON.stringify([command, ...args]);
+    if (options.sensitive)
+        showCommand = showCommand.replaceAll(options.sensitive, 'REDACTED');
+    // Run the command synchronously (blocking the event loop).
+    Core.info(`Running command: ${showCommand}`);
+    const process = (0, child_process_1.spawnSync)(command, args);
+    const output = String(process.output);
+    // If the command failed, throw an error.
+    if (process.status !== 0)
+        throw new Error(`Command failed: ${showCommand} with output:\n${output}`);
+    return output;
+}
 run();
 
 
@@ -8453,6 +8526,14 @@ module.exports = JSON.parse('[[[0,44],"disallowed_STD3_valid"],[[45,46],"valid"]
 
 "use strict";
 module.exports = require("assert");
+
+/***/ }),
+
+/***/ 3129:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("child_process");
 
 /***/ }),
 
