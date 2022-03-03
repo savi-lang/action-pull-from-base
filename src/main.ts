@@ -127,46 +127,46 @@ export async function createPullBranchLocally(input: {
   const branch = `pull-from-base/${input.commit.slice(0, 7)}`
   const auth = `${input.githubActor}:${input.githubToken}`
 
-  // Create an `upstream` remote corresponding to the source repository.
+  // Create an `source-repo` remote corresponding to the source repository.
   runCommand(
     '/usr/bin/env',
     [
       'git',
       'remote',
       'add',
-      'upstream',
+      'source-repo',
       `https://${auth}@github.com/${input.sourceRepoString}.git`,
     ],
     { sensitive: auth },
   )
 
-  // Create an `origin` remote corresponding to the source repository.
+  // Create an `target-repo` remote corresponding to the source repository.
   runCommand(
     '/usr/bin/env',
     [
       'git',
       'remote',
       'add',
-      'origin',
+      'target-repo',
       `https://${auth}@github.com/${input.targetRepoString}.git`,
     ],
     { sensitive: auth },
   )
 
-  // Fetch refs from the upstream, which should include the specified commit.
-  runCommand('/usr/bin/env', ['git', 'fetch', 'upstream'])
+  // Fetch refs from the source repo, which should include the specified commit.
+  runCommand('/usr/bin/env', ['git', 'fetch', 'source-repo'])
 
   // Checkout the specified commit into a new branch with the specified name.
   runCommand('/usr/bin/env', ['git', 'checkout', '-b', branch, input.commit])
 
-  // Push the branch to the origin.
+  // Push the branch to the target repo.
   runCommand('/usr/bin/env', [
     'git',
     'push',
     '-f',
     '-u',
     '--set-upstream',
-    'origin',
+    'target-repo',
     branch,
   ])
 
