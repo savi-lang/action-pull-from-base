@@ -1,5 +1,5 @@
 author: Savi
-name: pull-from-base
+name: Pull from Base
 description: >
   A GitHub Action to automatically create pull requests
   from a changing upstream base repository.
